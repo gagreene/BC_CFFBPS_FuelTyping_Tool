@@ -62,7 +62,6 @@ class FuelTyping:
         self.pct_cnfr = None
         self.dry_wet = None
         self.stocking = None
-        self.dom_cnfrs = None
 
         ## Instantiate Lists
         self.fldList = ['BCWFT_rowRef', 'FuelType', 'FT_Modifier', 'COAST_INTERIOR_CD', 'BCLCS_LEVEL_1',
