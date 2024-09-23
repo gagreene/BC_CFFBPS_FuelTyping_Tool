@@ -193,24 +193,25 @@ def main():
     # sg.theme('DarkAmber')   # Add a touch of color if desired (other themes available)
     """
     refList = ['BCWFT_rowRef', 'FuelType','FT_Modifier','COAST_INTERIOR_CD','INVENTORY_STANDARD_CD',
-                    'BCLCS_LEVEL_1','BCLCS_LEVEL_2','BCLCS_LEVEL_3','BCLCS_LEVEL_4','BCLCS_LEVEL_5',
-                    'BEC_ZONE_CODE','BEC_SUBZONE','EARLIEST_NONLOGGING_DIST_TYPE','EARLIEST_NONLOGGING_DIST_DATE','HARVEST_DATE',
-                    'CROWN_CLOSURE','PROJ_HEIGHT_1','PROJ_AGE_1','VRI_LIVE_STEMS_PER_HA','VRI_DEAD_STEMS_PER_HA',
-                    'STAND_PERCENTAGE_DEAD','NON_VEG_COVER_TYPE_1','NON_PRODUCTIVE_CD','LAND_COVER_CLASS_CD_1',
-                    'SPECIES_CD_1', 'SPECIES_PCT_1','SPECIES_CD_2', 'SPECIES_PCT_2','SPECIES_CD_3', 'SPECIES_PCT_3',
-                    'SPECIES_CD_4', 'SPECIES_PCT_4','SPECIES_CD_5', 'SPECIES_PCT_5','SPECIES_CD_6', 'SPECIES_PCT_6']
+               'BCLCS_LEVEL_1','BCLCS_LEVEL_2','BCLCS_LEVEL_3','BCLCS_LEVEL_4','BCLCS_LEVEL_5',
+               'BEC_ZONE_CODE','BEC_SUBZONE',
+               'EARLIEST_NONLOGGING_DIST_TYPE','EARLIEST_NONLOGGING_DIST_DATE','HARVEST_DATE',
+               'CROWN_CLOSURE','PROJ_HEIGHT_1','PROJ_AGE_1','VRI_LIVE_STEMS_PER_HA','VRI_DEAD_STEMS_PER_HA',
+               'STAND_PERCENTAGE_DEAD','NON_VEG_COVER_TYPE_1','NON_PRODUCTIVE_CD','LAND_COVER_CLASS_CD_1',
+               'SPECIES_CD_1', 'SPECIES_PCT_1','SPECIES_CD_2', 'SPECIES_PCT_2','SPECIES_CD_3', 'SPECIES_PCT_3',
+               'SPECIES_CD_4', 'SPECIES_PCT_4','SPECIES_CD_5', 'SPECIES_PCT_5','SPECIES_CD_6', 'SPECIES_PCT_6']
     """
-    bcFT = bcwft2018.BCFuelType()
-    treeList = bcFT.treeList
-    fldList = bcFT.fldList
+    bcwft = bcwft2018.FuelTyping()
+    treeList = bcwft.treeList
+    fldList = bcwft.fldList
     df = pd.DataFrame([], columns=fldList)
     df = pd.concat([df, pd.Series(name='UserData', dtype='object')], axis=1)
     df.loc['UserData'] = np.nan
-    fldDT_List = bcFT.fldDTypes
+    fldDT_List = bcwft.fldDTypes
     fldDT = dict(zip(fldList, fldDT_List))
     fldDTypes = pd.DataFrame(fldDT, index=['i', ])
-    becZones = bcFT.becZones
-    becSubzones = bcFT.becSubzones
+    becZones = bcwft.becZones
+    becSubzones = bcwft.becSubzones
 
     ftList = []
     BAR_MAX = 1
@@ -460,10 +461,10 @@ def main():
                 if values['EARLIEST_NONLOGGING_DIST_DATE'] == '':
                     df['EARLIEST_NONLOGGING_DIST_DATE'] = None
 
-                ftData = bcFT.getFuelType(season, df)
+                ftData = bcwft.getFuelType(season, *df.iloc[0][3:-1])
 
-                if ftData != None:
-                    if ftData[2] == None:
+                if ftData is not None:
+                    if ftData[2] is None:
                         window['ftOut'].update(ftData[1])
                     else:
                         window['ftOut'].update(f'{ftData[1]} ({ftData[2]}%)')
@@ -498,7 +499,7 @@ def main():
             env.workspace = values['inVRI_Source']
             ftList = arcpy.ListFeatureClasses(feature_type='Polygon')
 
-            if ftList != None:
+            if ftList is not None:
                 window['inVRI'].update(values=ftList)
             else:
                 window['inVRI'].update('')
@@ -524,9 +525,11 @@ def main():
                 arcpy.Delete_management('in_memory')
                 arcpy.ClearWorkspaceCache_management()
 
-                vri = arcpy.MakeFeatureLayer_management(
+                print('Importing the VRI dataset')
+                vri = 'in_memory\\vri'
+                arcpy.MakeFeatureLayer_management(
                     os.path.join(values['inVRI_Source'], values['inVRI'][0]),
-                    'vri'
+                    vri
                 )
                 fldLst = arcpy.ListFields(vri)
 
@@ -535,21 +538,21 @@ def main():
                     print('Adding "BCWFT_rowRef" field to VRI dataset')
                     arcpy.AddField_management(vri, 'BCWFT_rowRef', 'TEXT')
                 elif values['doAllData']:
-                    arcpy.management.CalculateField(vri, 'BCWFT_rowRef', None)
+                    arcpy.CalculateField_management(vri, 'BCWFT_rowRef', None)
 
                 # Add or reset FuelType field
                 if 'FuelType' not in fldLst:
                     print('Adding "FuelType" field to VRI dataset')
                     arcpy.AddField_management(vri, 'FuelType', 'TEXT')
                 elif values['doAllData']:
-                    arcpy.management.CalculateField(vri, 'FuelType', None)
+                    arcpy.CalculateField_management(vri, 'FuelType', None)
 
                 # Add or reset FT_Modifier field
                 if 'FT_Modifier' not in fldLst:
                     print('Adding "FT_Modifier" field to VRI dataset')
                     arcpy.AddField_management(vri, 'FT_Modifier', 'TEXT')
                 elif values['doAllData']:
-                    arcpy.management.CalculateField(vri, 'FT_Modifier', None)
+                    arcpy.CalculateField_management(vri, 'FT_Modifier', None)
 
                 vriTableView = 'in_memory\\vriTableView'
 
@@ -572,8 +575,8 @@ def main():
                 with arcpy.da.UpdateCursor(vriTableView, fldList) as cursor:
                     print('Assigning Fuel Types')
                     for count, row in enumerate(cursor):
-                        fuelData = bcFT.getFuelType(season, row)
-                        if fuelData != None:
+                        fuelData = bcwft.getFuelType(season, row)
+                        if fuelData is not None:
                             row[0], row[1], row[2] = fuelData
                         else:
                             row[0], row[1], row[2] = None, 'NoMatchingFuelType_ERROR', None
@@ -587,11 +590,8 @@ def main():
                     arcpy.SelectLayerByAttribute_management(vri, 'CLEAR_SELECTION')
 
                 # DELETE TEMPORARY DATA
-                del BAR_MAX
-                del REMAINING
-                del PROGRESS
-                del count
-                del vriTableView
+                del BAR_MAX, REMAINING, PROGRESS
+                del count, vriTableView
                 arcpy.Delete_management('in_memory')
                 arcpy.ClearWorkspaceCache_management()
             except arcpy.ExecuteError:
@@ -603,7 +603,7 @@ def main():
                 arcpy.Delete_management('in_memory')
                 arcpy.ClearWorkspaceCache_management()
 
-        if (event == None) or (event == 'Close Program'):  # if user closes window or clicks close program
+        if (event is None) or (event == 'Close Program'):  # if user closes window or clicks close program
             break
 
     # Close  the window
