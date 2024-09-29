@@ -8,7 +8,7 @@ __author__ = ['Gregory A. Greene, map.n.trowel@gmail.com']
 
 import inspect
 import pandas as pd
-from numpy import nan as nan
+from numpy import nan, datetime64
 from datetime import datetime as dt
 
 
@@ -124,7 +124,9 @@ class FuelTyping:
     def verifyInputs(self):
         if not isinstance(self.season, str):
             raise TypeError('The "season" parameter must be string data type.')
-        if not isinstance(self.COAST_INTERIOR_CD, str):
+        elif self.season not in ['growing', 'dormant']:
+            raise ValueError('The "season" parameter must be either "growing" or "dormant".')
+        if not isinstance(self.COAST_INTERIOR_CD, (str, type(None))):
             raise TypeError('The "COAST_INTERIOR_CD" parameter must be string data type.')
         if not isinstance(self.BCLCS_LEVEL_1, (str, type(None), type(nan))):
             raise TypeError('The "BCLCS_LEVEL_1" parameter must be string data type.')
@@ -268,7 +270,7 @@ class FuelTyping:
         currentYear = dt.now().year
         if self.EARLIEST_NONLOGGING_DIST_DATE is not None:
             if self.EARLIEST_NONLOGGING_DIST_DATE.year > currentYear:
-                self.dist_lag = 'EARLIEST_NONLOGGING_DIST_DATE-ERROR', None
+                self.dist_lag = 'EARLIEST_NONLOGGING_DIST_DATE-ERROR'
             else:
                 self.dist_lag = currentYear - self.EARLIEST_NONLOGGING_DIST_DATE.year
         else:
@@ -368,14 +370,14 @@ class FuelTyping:
         if not cnfrList:
             cnfrPrcnt = 0  # ASSIGN AS 0 IF NO CONIFER SPECIES IN CHECKLIST FOUND AT SITE
         else:
-            cnfrPrcnt = spDF[cnfrList][0]  # GET MAXIMUM PERCENTAGE OF CONIFERS IN CHECKLIST
+            cnfrPrcnt = spDF[cnfrList].max()  # GET MAXIMUM PERCENTAGE OF CONIFERS IN CHECKLIST
 
         # GET LIST OF ALL OTHER CONIFERS AT SITE
         altCnfrList = [i for i in sppCdList if ((not i in checkList) and (i in self.coniferList))]
         if not altCnfrList:
             altCnfrPrcnt = 0  # ASSIGN AS 0 IF NO OTHER CONIFER SPECIES FOUND AT SITE
         else:
-            altCnfrPrcnt = spDF[altCnfrList][0]  # GET MAXIMUM PERCENTAGE OF ALL OTHER CONIFERS
+            altCnfrPrcnt = spDF[altCnfrList].max()  # GET MAXIMUM PERCENTAGE OF ALL OTHER CONIFERS
 
         # Compare species and return result
         if cnfrPrcnt != 0 and cnfrPrcnt == altCnfrPrcnt:
@@ -405,12 +407,12 @@ class FuelTyping:
                 #### SITE HARVESTED WITHIN LAST 7-24 YEARS
                 elif self.harv_lag <= 24:
                     if self.BEC_ZONE_CODE in ['CWH', 'MH', 'ICH']:
-                        if self.season == 'Dormant':
+                        if self.season == 'dormant':
                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-1', None
                         else:
                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-2', None
                     else:
-                        if self.season == 'Dormant':
+                        if self.season == 'dormant':
                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1a', None
                         else:
                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1b', None
@@ -419,7 +421,7 @@ class FuelTyping:
                     if self.BEC_ZONE_CODE in ['CMA', 'IMA']:
                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'N', None
                     elif self.BEC_ZONE_CODE in ['BAFA', 'MH']:
-                        if self.season == 'Dormant':
+                        if self.season == 'dormant':
                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-1', None
                         else:
                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-2', None
@@ -428,7 +430,7 @@ class FuelTyping:
                     elif self.BEC_ZONE_CODE in ['BWBS']:
                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'C-2', None
                     elif self.BEC_ZONE_CODE == 'SWB':
-                        if self.season == 'Dormant':
+                        if self.season == 'dormant':
                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'M-1', 50
                         else:
                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'M-2', 50
@@ -439,12 +441,12 @@ class FuelTyping:
                             self.BEC_ZONE_CODE in ['IDF', 'CDF'] and self.dry_wet == 'dry'):
                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'C-7', None
                     elif self.BEC_ZONE_CODE in ['PP', 'BG']:
-                        if self.season == 'Dormant':
+                        if self.season == 'dormant':
                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1a', None
                         else:
                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1b', None
                     elif self.BEC_ZONE_CODE == 'CWH' and self.dry_wet == 'dry':
-                        if self.season == 'Dormant':
+                        if self.season == 'dormant':
                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'M-1', 40
                         else:
                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'M-2', 40
@@ -455,12 +457,12 @@ class FuelTyping:
                     if self.dist_lag <= 3:
                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'N', None
                     elif self.dist_lag <= 6:
-                        if self.season == 'Dormant':
+                        if self.season == 'dormant':
                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-1', None
                         else:
                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-2', None
                     elif self.dist_lag <= 10:
-                        if self.season == 'Dormant':
+                        if self.season == 'dormant':
                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1a', None
                         else:
                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1b', None
@@ -469,12 +471,12 @@ class FuelTyping:
                     if self.BCLCS_LEVEL_2 in ['L', None]:
                         if self.SPECIES_CD_1 is not None:
                             if self.BEC_ZONE_CODE in ['CWH', 'MH', 'ICH']:
-                                if self.season == 'Dormant':
+                                if self.season == 'dormant':
                                     return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-1', None
                                 else:
                                     return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-2', None
                             else:
-                                if self.season == 'Dormant':
+                                if self.season == 'dormant':
                                     return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1a', None
                                 else:
                                     return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1b', None
@@ -494,7 +496,7 @@ class FuelTyping:
                             if self.dist_lag <= 3:
                                 return inspect.getframeinfo(inspect.currentframe()).lineno, 'N', None
                             elif self.dist_lag <= 6:
-                                if self.season == 'Dormant':
+                                if self.season == 'dormant':
                                     return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-1', None
                                 else:
                                     return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-2', None
@@ -504,12 +506,12 @@ class FuelTyping:
                             if self.dist_lag <= 1:
                                 return inspect.getframeinfo(inspect.currentframe()).lineno, 'N', None
                             elif self.dist_lag <= 6:
-                                if self.season == 'Dormant':
+                                if self.season == 'dormant':
                                     return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-1', None
                                 else:
                                     return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-2', None
                             else:  # if self.dist_lag <= 10:
-                                if self.season == 'Dormant':
+                                if self.season == 'dormant':
                                     return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1a', None
                                 else:
                                     return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1b', None
@@ -517,7 +519,7 @@ class FuelTyping:
                         if self.dist_lag <= 1:
                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'N', None
                         else:  # if self.dist_lag <= 10:
-                            if self.season == 'Dormant':
+                            if self.season == 'dormant':
                                 return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-1', None
                             else:
                                 return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-2', None
@@ -537,7 +539,7 @@ class FuelTyping:
                                     if self.BCLCS_LEVEL_5 == 'SP':  #### SPARSE STANDS
                                         if (self.BEC_ZONE_CODE in ['CWH', 'CDF', 'MH']) or (
                                                 self.BEC_ZONE_CODE in ['ICH'] and self.dry_wet == 'wet'):
-                                            if self.season == 'Dormant':
+                                            if self.season == 'dormant':
                                                 return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-1', None
                                             else:
                                                 return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-2', None
@@ -545,7 +547,7 @@ class FuelTyping:
                                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'C-7', None
                                     else:  #### DENSE OR OPEN STANDS
                                         if self.PROJ_HEIGHT_1 < 4:
-                                            if self.season == 'Dormant':
+                                            if self.season == 'dormant':
                                                 return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1a', None
                                             else:
                                                 return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1b', None
@@ -597,7 +599,7 @@ class FuelTyping:
                                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'S-1', None
                                     else:
                                         if self.PROJ_HEIGHT_1 < 4:
-                                            if self.season == 'Dormant':
+                                            if self.season == 'dormant':
                                                 return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1a', None
                                             else:
                                                 return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1b', None
@@ -617,7 +619,7 @@ class FuelTyping:
                                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'C-7', None
                                 elif self.BCLCS_LEVEL_5 == 'SP':  #### SPARSE STANDS
                                     if self.STAND_PERCENTAGE_DEAD is not None and self.STAND_PERCENTAGE_DEAD >= 40:
-                                        if self.season == 'Dormant':
+                                        if self.season == 'dormant':
                                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1a', None
                                         else:
                                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1b', None
@@ -651,12 +653,12 @@ class FuelTyping:
                                     if self.PROJ_HEIGHT_1 is not None and self.PROJ_HEIGHT_1 < 4:
                                         if (self.BEC_ZONE_CODE in ['CWH', 'MH', 'CDF']) or (
                                                 self.BEC_ZONE_CODE == 'ICH' and self.dry_wet == 'wet'):
-                                            if self.season == 'Dormant':
+                                            if self.season == 'dormant':
                                                 return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-1', None
                                             else:
                                                 return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-2', None
                                         else:
-                                            if self.season == 'Dormant':
+                                            if self.season == 'dormant':
                                                 return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1a', None
                                             else:
                                                 return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1b', None
@@ -691,14 +693,14 @@ class FuelTyping:
                                         else:  # if self.CROWN_CLOSURE < 26:
                                             if (self.BEC_ZONE_CODE in ['CWH', 'MH', 'CDF']) or (
                                                     self.BEC_ZONE_CODE == 'ICH' and self.dry_wet == 'wet'):
-                                                if self.season == 'Dormant':
+                                                if self.season == 'dormant':
                                                     return inspect.getframeinfo(
                                                         inspect.currentframe()).lineno, 'D-1', None
                                                 else:
                                                     return inspect.getframeinfo(
                                                         inspect.currentframe()).lineno, 'D-2', None
                                             else:
-                                                if self.season == 'Dormant':
+                                                if self.season == 'dormant':
                                                     return inspect.getframeinfo(
                                                         inspect.currentframe()).lineno, 'O-1a', None
                                                 else:
@@ -713,7 +715,7 @@ class FuelTyping:
                                     return inspect.getframeinfo(inspect.currentframe()).lineno, 'S-2', None
                                 else:
                                     if self.BCLCS_LEVEL_5 == 'SP':
-                                        if self.season == 'Dormant':
+                                        if self.season == 'dormant':
                                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-1', None
                                         else:
                                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-2', None
@@ -727,7 +729,7 @@ class FuelTyping:
                                     return inspect.getframeinfo(inspect.currentframe()).lineno, 'S-3', None
                                 else:
                                     if self.BCLCS_LEVEL_5 == 'SP':
-                                        if self.season == 'Dormant':
+                                        if self.season == 'dormant':
                                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-1', None
                                         else:
                                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-2', None
@@ -744,7 +746,7 @@ class FuelTyping:
                                         if self.BEC_ZONE_CODE in ['BWBS', 'SWB']:
                                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'C-1', None
                                         else:
-                                            if self.season == 'Dormant':
+                                            if self.season == 'dormant':
                                                 return inspect.getframeinfo(inspect.currentframe()).lineno, 'M-1', 30
                                             else:
                                                 return inspect.getframeinfo(inspect.currentframe()).lineno, 'M-2', 30
@@ -767,7 +769,7 @@ class FuelTyping:
                                                 return inspect.getframeinfo(inspect.currentframe()).lineno, 'C-5', None
                                             else:  # if self.COAST_INTERIOR_CD == 'I' and self.SPECIES_CD_1 != 'SS':
                                                 if self.PROJ_HEIGHT_1 < 4:
-                                                    if self.season == 'Dormant':
+                                                    if self.season == 'dormant':
                                                         return inspect.getframeinfo(
                                                             inspect.currentframe()).lineno, 'O-1a', None
                                                     else:
@@ -793,7 +795,7 @@ class FuelTyping:
                                 else:
                                     if self.BCLCS_LEVEL_5 == 'DE':
                                         if self.PROJ_HEIGHT_1 < 4:
-                                            if self.season == 'Dormant':
+                                            if self.season == 'dormant':
                                                 return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-1', None
                                             else:
                                                 return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-2', None
@@ -803,7 +805,7 @@ class FuelTyping:
                                             if self.PROJ_AGE_1 < 60:
                                                 return inspect.getframeinfo(inspect.currentframe()).lineno, 'C-3', None
                                             elif self.PROJ_AGE_1 <= 99:
-                                                if self.season == 'Dormant':
+                                                if self.season == 'dormant':
                                                     return inspect.getframeinfo(
                                                         inspect.currentframe()).lineno, 'M-1', 30
                                                 else:
@@ -814,7 +816,7 @@ class FuelTyping:
                                     elif self.BCLCS_LEVEL_5 == 'OP':
                                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'C-5', None
                                     elif self.BCLCS_LEVEL_5 == 'SP':
-                                        if self.season == 'Dormant':
+                                        if self.season == 'dormant':
                                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-1', None
                                         else:
                                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-2', None
@@ -824,7 +826,7 @@ class FuelTyping:
                                 if self.SPECIES_CD_1 == 'BG':
                                     return inspect.getframeinfo(inspect.currentframe()).lineno, 'C-7', None
                                 elif self.SPECIES_CD_1 == 'BA':
-                                    if self.season == 'Dormant':
+                                    if self.season == 'dormant':
                                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'M-1', 30
                                     else:
                                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'M-2', 30
@@ -838,7 +840,7 @@ class FuelTyping:
                                 return inspect.getframeinfo(inspect.currentframe()).lineno, 'C-5', None
                             #### PURE JUNIPER STANDS
                             elif self.SPECIES_CD_1 in ['J', 'JR']:
-                                if self.season == 'Dormant':
+                                if self.season == 'dormant':
                                     return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1a', None
                                 else:
                                     return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1b', None
@@ -846,7 +848,7 @@ class FuelTyping:
                                 return inspect.getframeinfo(
                                     inspect.currentframe()).lineno, 'VegForestedPureSpeciesStand_Species-ERROR', None
                         else:  #### DECIDUOUS/BROADLEAF OR LARCH STAND
-                            if self.season == 'Dormant':
+                            if self.season == 'dormant':
                                 return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-1', None
                             else:
                                 return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-2', None
@@ -854,7 +856,7 @@ class FuelTyping:
                     elif self.SPECIES_PCT_1 < 80:
                         #### MIXED-SPECIES DECIDUOUS STANDS
                         if self.pct_cnfr <= 20:
-                            if self.season == 'Dormant':
+                            if self.season == 'dormant':
                                 return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-1', None
                             else:
                                 return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-2', None
@@ -868,7 +870,7 @@ class FuelTyping:
                                     #### DOMINANT CONIFER = BLACK, WHITE, ENGELMANN, OR HYBRID SPRUCE
                                     if self.checkDomConifers(['SB', 'SW', 'SE', 'SX', 'SXB',
                                                               'SXE', 'SXL', 'SXS', 'SXW', 'SXX']):
-                                        if self.season == 'Dormant':
+                                        if self.season == 'dormant':
                                             return inspect.getframeinfo(
                                                 inspect.currentframe()).lineno, 'M-1', self.pct_cnfr
                                         else:
@@ -877,14 +879,14 @@ class FuelTyping:
                                     #### DOMINANT CONIFER = UNKNOWN SPRUCE
                                     elif self.checkDomConifers(['S']):
                                         if self.COAST_INTERIOR_CD == 'C':
-                                            if self.season == 'Dormant':
+                                            if self.season == 'dormant':
                                                 return inspect.getframeinfo(
                                                     inspect.currentframe()).lineno, 'M-1', self.pct_cnfr * 0.5
                                             else:
                                                 return inspect.getframeinfo(
                                                     inspect.currentframe()).lineno, 'M-2', self.pct_cnfr * 0.5
                                         else:  # if self.COAST_INTERIOR_CD == 'I':
-                                            if self.season == 'Dormant':
+                                            if self.season == 'dormant':
                                                 return inspect.getframeinfo(
                                                     inspect.currentframe()).lineno, 'M-1', self.pct_cnfr
                                             else:
@@ -893,14 +895,14 @@ class FuelTyping:
                                     #### DOMINANT CONIFER = ANY OTHER CONIFER
                                     else:
                                         if self.BCLCS_LEVEL_5 == 'SP':
-                                            if self.season == 'Dormant':
+                                            if self.season == 'dormant':
                                                 return inspect.getframeinfo(
                                                     inspect.currentframe()).lineno, 'M-1', self.pct_cnfr * 0.5
                                             else:
                                                 return inspect.getframeinfo(
                                                     inspect.currentframe()).lineno, 'M-2', self.pct_cnfr * 0.5
                                         else:
-                                            if self.season == 'Dormant':
+                                            if self.season == 'dormant':
                                                 return inspect.getframeinfo(
                                                     inspect.currentframe()).lineno, 'M-1', self.pct_cnfr * 0.7
                                             else:
@@ -914,21 +916,21 @@ class FuelTyping:
                                     #### DOMINANT CONIFER = LODGEPOLE PINE
                                     if self.checkDomConifers(['PL', 'PLI', 'PLC', 'PJ', 'PXJ', 'P']):
                                         if self.BCLCS_LEVEL_5 == 'SP':
-                                            if self.season == 'Dormant':
+                                            if self.season == 'dormant':
                                                 return inspect.getframeinfo(
                                                     inspect.currentframe()).lineno, 'M-1', self.pct_cnfr * 0.6
                                             else:
                                                 return inspect.getframeinfo(
                                                     inspect.currentframe()).lineno, 'M-2', self.pct_cnfr * 0.6
                                         elif self.BCLCS_LEVEL_5 == 'OP':
-                                            if self.season == 'Dormant':
+                                            if self.season == 'dormant':
                                                 return inspect.getframeinfo(
                                                     inspect.currentframe()).lineno, 'M-1', self.pct_cnfr * 0.7
                                             else:
                                                 return inspect.getframeinfo(
                                                     inspect.currentframe()).lineno, 'M-2', self.pct_cnfr * 0.7
                                         elif self.BCLCS_LEVEL_5 == 'DE':
-                                            if self.season == 'Dormant':
+                                            if self.season == 'dormant':
                                                 return inspect.getframeinfo(
                                                     inspect.currentframe()).lineno, 'M-1', self.pct_cnfr * 0.8
                                             else:
@@ -936,7 +938,7 @@ class FuelTyping:
                                                     inspect.currentframe()).lineno, 'M-2', self.pct_cnfr * 0.8
                                     #### DOMINANT CONIFER = PONDEROSA PINE
                                     elif self.checkDomConifers(['PY']):
-                                        if self.season == 'Dormant':
+                                        if self.season == 'dormant':
                                             return inspect.getframeinfo(
                                                 inspect.currentframe()).lineno, 'M-1', self.pct_cnfr * 0.6
                                         else:
@@ -944,7 +946,7 @@ class FuelTyping:
                                                 inspect.currentframe()).lineno, 'M-2', self.pct_cnfr * 0.6
                                     #### DOMINANT CONIFER = OTHER PINE
                                     elif self.checkDomConifers(['PA', 'PF', 'PW']):
-                                        if self.season == 'Dormant':
+                                        if self.season == 'dormant':
                                             return inspect.getframeinfo(
                                                 inspect.currentframe()).lineno, 'M-1', self.pct_cnfr * 0.5
                                         else:
@@ -953,14 +955,14 @@ class FuelTyping:
                                     #### DOMINANT CONIFER = DOUGLAS-FIR
                                     elif self.checkDomConifers(['F', 'FD', 'FDC', 'FDI']):
                                         if self.BEC_ZONE_CODE in ['CWH', 'CDF', 'ICH']:
-                                            if self.season == 'Dormant':
+                                            if self.season == 'dormant':
                                                 return inspect.getframeinfo(
                                                     inspect.currentframe()).lineno, 'M-1', self.pct_cnfr * 0.5
                                             else:
                                                 return inspect.getframeinfo(
                                                     inspect.currentframe()).lineno, 'M-2', self.pct_cnfr * 0.5
                                         else:
-                                            if self.season == 'Dormant':
+                                            if self.season == 'dormant':
                                                 return inspect.getframeinfo(
                                                     inspect.currentframe()).lineno, 'M-1', self.pct_cnfr * 0.6
                                             else:
@@ -969,14 +971,14 @@ class FuelTyping:
                                     #### DOMINANT CONIFER = ENGELMANN SPRUCE
                                     elif self.checkDomConifers(['SE']):
                                         if self.BCLCS_LEVEL_5 == 'SP':
-                                            if self.season == 'Dormant':
+                                            if self.season == 'dormant':
                                                 return inspect.getframeinfo(
                                                     inspect.currentframe()).lineno, 'M-1', self.pct_cnfr * 0.6
                                             else:
                                                 return inspect.getframeinfo(
                                                     inspect.currentframe()).lineno, 'M-2', self.pct_cnfr * 0.6
                                         elif self.BCLCS_LEVEL_5 in ['OP', 'DE']:
-                                            if self.season == 'Dormant':
+                                            if self.season == 'dormant':
                                                 return inspect.getframeinfo(
                                                     inspect.currentframe()).lineno, 'M-1', self.pct_cnfr * 0.9
                                             else:
@@ -984,7 +986,7 @@ class FuelTyping:
                                                     inspect.currentframe()).lineno, 'M-2', self.pct_cnfr * 0.9
                                     #### DOMINANT CONIFER = SITKA SPRUCE
                                     elif self.checkDomConifers(['SS']):
-                                        if self.season == 'Dormant':
+                                        if self.season == 'dormant':
                                             return inspect.getframeinfo(
                                                 inspect.currentframe()).lineno, 'M-1', self.pct_cnfr * 0.4
                                         else:
@@ -992,7 +994,7 @@ class FuelTyping:
                                                 inspect.currentframe()).lineno, 'M-2', self.pct_cnfr * 0.4
                                     #### DOMINANT CONIFER = BLACK OR WHITE SPRUCE
                                     elif self.checkDomConifers(['SB', 'SW']):
-                                        if self.season == 'Dormant':
+                                        if self.season == 'dormant':
                                             return inspect.getframeinfo(
                                                 inspect.currentframe()).lineno, 'M-1', self.pct_cnfr
                                         else:
@@ -1002,14 +1004,14 @@ class FuelTyping:
                                     elif self.checkDomConifers(['SX', 'SXB', 'SXE', 'SXL', 'SXS', 'SXW', 'SXX', 'S']):
                                         if self.BEC_ZONE_CODE in ['BWBS', 'SWB']:
                                             if self.BCLCS_LEVEL_5 in ['DE', 'OP']:
-                                                if self.season == 'Dormant':
+                                                if self.season == 'dormant':
                                                     return inspect.getframeinfo(
                                                         inspect.currentframe()).lineno, 'M-1', self.pct_cnfr
                                                 else:
                                                     return inspect.getframeinfo(
                                                         inspect.currentframe()).lineno, 'M-2', self.pct_cnfr
                                             elif self.BCLCS_LEVEL_5 in ['SP']:
-                                                if self.season == 'Dormant':
+                                                if self.season == 'dormant':
                                                     return inspect.getframeinfo(
                                                         inspect.currentframe()).lineno, 'M-1', self.pct_cnfr * 0.6
                                                 else:
@@ -1017,7 +1019,7 @@ class FuelTyping:
                                                         inspect.currentframe()).lineno, 'M-2', self.pct_cnfr * 0.6
                                         else:
                                             if self.BCLCS_LEVEL_5 in ['SP']:
-                                                if self.season == 'Dormant':
+                                                if self.season == 'dormant':
                                                     return inspect.getframeinfo(
                                                         inspect.currentframe()).lineno, 'M-1', self.pct_cnfr * 0.6
                                                 else:
@@ -1025,14 +1027,14 @@ class FuelTyping:
                                                         inspect.currentframe()).lineno, 'M-2', self.pct_cnfr * 0.6
                                             elif self.BCLCS_LEVEL_5 in ['DE', 'OP']:
                                                 if self.COAST_INTERIOR_CD == 'I':
-                                                    if self.season == 'Dormant':
+                                                    if self.season == 'dormant':
                                                         return inspect.getframeinfo(
                                                             inspect.currentframe()).lineno, 'M-1', self.pct_cnfr * 0.8
                                                     else:
                                                         return inspect.getframeinfo(
                                                             inspect.currentframe()).lineno, 'M-2', self.pct_cnfr * 0.8
                                                 elif self.COAST_INTERIOR_CD == 'C':
-                                                    if self.season == 'Dormant':
+                                                    if self.season == 'dormant':
                                                         return inspect.getframeinfo(
                                                             inspect.currentframe()).lineno, 'M-1', self.pct_cnfr * 0.5
                                                     else:
@@ -1043,7 +1045,7 @@ class FuelTyping:
                                                     inspect.currentframe()).lineno, 'VegForestMixedSpeciesCnfrLT65_BCLCSLv5-ERROR', None
                                     #### DOMINANT CONIFER = REDCEDAR, YELLOW CEDAR OR HEMLOCK
                                     elif self.checkDomConifers(['C', 'CW', 'Y', 'YC', 'H', 'HM', 'HW', 'HXM']):
-                                        if self.season == 'Dormant':
+                                        if self.season == 'dormant':
                                             return inspect.getframeinfo(
                                                 inspect.currentframe()).lineno, 'M-1', self.pct_cnfr * 0.4
                                         else:
@@ -1051,7 +1053,7 @@ class FuelTyping:
                                                 inspect.currentframe()).lineno, 'M-2', self.pct_cnfr * 0.4
                                     #### DOMINANT CONIFER = FIR
                                     elif self.checkDomConifers(['B', 'BA', 'BG', 'BL']):
-                                        if self.season == 'Dormant':
+                                        if self.season == 'dormant':
                                             return inspect.getframeinfo(
                                                 inspect.currentframe()).lineno, 'M-1', self.pct_cnfr * 0.6
                                         else:
@@ -1062,7 +1064,7 @@ class FuelTyping:
                                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'C-5', None
                                     #### DOMINANT CONIFER = JUNIPER
                                     elif self.checkDomConifers(['J', 'JR']):
-                                        if self.season == 'Dormant':
+                                        if self.season == 'dormant':
                                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1a', None
                                         else:
                                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1b', None
@@ -1074,21 +1076,21 @@ class FuelTyping:
                                     #### DOMINANT CONIFER = LODGEPOLE PINE
                                     if self.checkDomConifers(['PL', 'PLI', 'PLC', 'PJ', 'PXJ', 'P']):
                                         if self.BCLCS_LEVEL_5 in ['SP']:
-                                            if self.season == 'Dormant':
+                                            if self.season == 'dormant':
                                                 return inspect.getframeinfo(
                                                     inspect.currentframe()).lineno, 'M-1', self.pct_cnfr * 0.5
                                             else:
                                                 return inspect.getframeinfo(
                                                     inspect.currentframe()).lineno, 'M-2', self.pct_cnfr * 0.5
                                         elif self.BCLCS_LEVEL_5 in ['OP']:
-                                            if self.season == 'Dormant':
+                                            if self.season == 'dormant':
                                                 return inspect.getframeinfo(
                                                     inspect.currentframe()).lineno, 'M-1', self.pct_cnfr * 0.7
                                             else:
                                                 return inspect.getframeinfo(
                                                     inspect.currentframe()).lineno, 'M-2', self.pct_cnfr * 0.7
                                         elif self.BCLCS_LEVEL_5 in ['DE']:
-                                            if self.season == 'Dormant':
+                                            if self.season == 'dormant':
                                                 return inspect.getframeinfo(
                                                     inspect.currentframe()).lineno, 'M-1', self.pct_cnfr * 0.8
                                             else:
@@ -1107,7 +1109,7 @@ class FuelTyping:
                                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'C-5', None
                                         else:
                                             if self.BCLCS_LEVEL_5 in ['DE']:
-                                                if self.season == 'Dormant':
+                                                if self.season == 'dormant':
                                                     return inspect.getframeinfo(
                                                         inspect.currentframe()).lineno, 'M-1', self.pct_cnfr * 0.7
                                                 else:
@@ -1118,14 +1120,14 @@ class FuelTyping:
                                     #### DOMINANT CONIFER = ENGELMANN SPRUCE
                                     elif self.checkDomConifers(['SE']):
                                         if self.BCLCS_LEVEL_5 in ['SP']:
-                                            if self.season == 'Dormant':
+                                            if self.season == 'dormant':
                                                 return inspect.getframeinfo(
                                                     inspect.currentframe()).lineno, 'M-1', self.pct_cnfr * 0.6
                                             else:
                                                 return inspect.getframeinfo(
                                                     inspect.currentframe()).lineno, 'M-2', self.pct_cnfr * 0.6
                                         elif self.BCLCS_LEVEL_5 in ['OP', 'DE']:
-                                            if self.season == 'Dormant':
+                                            if self.season == 'dormant':
                                                 return inspect.getframeinfo(
                                                     inspect.currentframe()).lineno, 'M-1', self.pct_cnfr * 0.7
                                             else:
@@ -1136,7 +1138,7 @@ class FuelTyping:
                                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'C-5', None
                                     #### DOMINANT CONIFER = BLACK OR WHITE SPRUCE
                                     elif self.checkDomConifers(['SB', 'SW']):
-                                        if self.season == 'Dormant':
+                                        if self.season == 'dormant':
                                             return inspect.getframeinfo(
                                                 inspect.currentframe()).lineno, 'M-1', self.pct_cnfr
                                         else:
@@ -1146,14 +1148,14 @@ class FuelTyping:
                                     elif self.checkDomConifers(['SX', 'SXB', 'SXE', 'SXL', 'SXS', 'SXW', 'SXX', 'S']):
                                         if self.BEC_ZONE_CODE in ['BWBS', 'SWB']:
                                             if self.BCLCS_LEVEL_5 in ['DE', 'OP']:
-                                                if self.season == 'Dormant':
+                                                if self.season == 'dormant':
                                                     return inspect.getframeinfo(
                                                         inspect.currentframe()).lineno, 'M-1', self.pct_cnfr
                                                 else:
                                                     return inspect.getframeinfo(
                                                         inspect.currentframe()).lineno, 'M-2', self.pct_cnfr
                                             if self.BCLCS_LEVEL_5 in ['SP']:
-                                                if self.season == 'Dormant':
+                                                if self.season == 'dormant':
                                                     return inspect.getframeinfo(
                                                         inspect.currentframe()).lineno, 'M-1', self.pct_cnfr * 0.6
                                                 else:
@@ -1161,7 +1163,7 @@ class FuelTyping:
                                                         inspect.currentframe()).lineno, 'M-2', self.pct_cnfr * 0.6
                                         else:
                                             if self.BCLCS_LEVEL_5 in ['SP']:
-                                                if self.season == 'Dormant':
+                                                if self.season == 'dormant':
                                                     return inspect.getframeinfo(
                                                         inspect.currentframe()).lineno, 'M-1', self.pct_cnfr * 0.6
                                                 else:
@@ -1169,7 +1171,7 @@ class FuelTyping:
                                                         inspect.currentframe()).lineno, 'M-2', self.pct_cnfr * 0.6
                                             else:  # self.BCLCS_LEVEL_5 in ['DE','OP']:
                                                 if self.COAST_INTERIOR_CD == 'I':
-                                                    if self.season == 'Dormant':
+                                                    if self.season == 'dormant':
                                                         return inspect.getframeinfo(
                                                             inspect.currentframe()).lineno, 'M-1', self.pct_cnfr * 0.8
                                                     else:
@@ -1200,7 +1202,7 @@ class FuelTyping:
                                         if self.BCLCS_LEVEL_5 in ['SP']:
                                             if (self.BEC_ZONE_CODE in ['CWH', 'CDF', 'MH']) or (
                                                     self.BEC_ZONE_CODE == 'ICH' and self.dry_wet == 'wet'):
-                                                if self.season == 'Dormant':
+                                                if self.season == 'dormant':
                                                     return inspect.getframeinfo(
                                                         inspect.currentframe()).lineno, 'D-1', None
                                                 else:
@@ -1210,7 +1212,7 @@ class FuelTyping:
                                                 return inspect.getframeinfo(inspect.currentframe()).lineno, 'C-7', None
                                         else:  # if self.BCLCS_LEVEL_5 in ['DE','OP']:
                                             if self.PROJ_HEIGHT_1 < 4:
-                                                if self.season == 'Dormant':
+                                                if self.season == 'dormant':
                                                     return inspect.getframeinfo(
                                                         inspect.currentframe()).lineno, 'O-1a', None
                                                 else:
@@ -1304,7 +1306,7 @@ class FuelTyping:
                                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'S-1', None
                                     else:  # self.harv_lag > 7:
                                         if self.PROJ_HEIGHT_1 < 4:
-                                            if self.season == 'Dormant':
+                                            if self.season == 'dormant':
                                                 return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1a', None
                                             else:
                                                 return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1b', None
@@ -1336,14 +1338,14 @@ class FuelTyping:
                                         if self.PROJ_HEIGHT_1 < 4:
                                             if (self.BEC_ZONE_CODE in ['CWH', 'MH', 'CDF']) or (
                                                     self.BEC_ZONE_CODE == 'ICH' and self.dry_wet == 'wet'):
-                                                if self.season == 'Dormant':
+                                                if self.season == 'dormant':
                                                     return inspect.getframeinfo(
                                                         inspect.currentframe()).lineno, 'D-1', None
                                                 else:
                                                     return inspect.getframeinfo(
                                                         inspect.currentframe()).lineno, 'D-2', None
                                             else:
-                                                if self.season == 'Dormant':
+                                                if self.season == 'dormant':
                                                     return inspect.getframeinfo(
                                                         inspect.currentframe()).lineno, 'O-1a', None
                                                 else:
@@ -1386,14 +1388,14 @@ class FuelTyping:
                                             else:
                                                 if (self.BEC_ZONE_CODE in ['CWH', 'MH', 'CDF']) or (
                                                         self.BEC_ZONE_CODE == 'ICH' and self.dry_wet == 'wet'):
-                                                    if self.season == 'Dormant':
+                                                    if self.season == 'dormant':
                                                         return inspect.getframeinfo(
                                                             inspect.currentframe()).lineno, 'D-1', None
                                                     else:
                                                         return inspect.getframeinfo(
                                                             inspect.currentframe()).lineno, 'D-2', None
                                                 else:
-                                                    if self.season == 'Dormant':
+                                                    if self.season == 'dormant':
                                                         return inspect.getframeinfo(
                                                             inspect.currentframe()).lineno, 'O-1a', None
                                                     else:
@@ -1493,7 +1495,7 @@ class FuelTyping:
                                     else:  # self.harv_lag > 6:
                                         if self.BCLCS_LEVEL_5 == 'DE':
                                             if self.PROJ_HEIGHT_1 < 4:
-                                                if self.season == 'Dormant':
+                                                if self.season == 'dormant':
                                                     return inspect.getframeinfo(
                                                         inspect.currentframe()).lineno, 'D-1', None
                                                 else:
@@ -1506,7 +1508,7 @@ class FuelTyping:
                                                     return inspect.getframeinfo(
                                                         inspect.currentframe()).lineno, 'C-3', None
                                                 elif self.PROJ_AGE_1 <= 99:
-                                                    if self.season == 'Dormant':
+                                                    if self.season == 'dormant':
                                                         return inspect.getframeinfo(
                                                             inspect.currentframe()).lineno, 'M-1', 40
                                                     else:
@@ -1518,7 +1520,7 @@ class FuelTyping:
                                         elif self.BCLCS_LEVEL_5 in ['OP']:
                                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'C-5', None
                                         else:  # self.BCLCS_LEVEL_5 in ['SP']:
-                                            if self.season == 'Dormant':
+                                            if self.season == 'dormant':
                                                 return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-1', None
                                             else:
                                                 return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-2', None
@@ -1530,14 +1532,14 @@ class FuelTyping:
                                     if self.SPECIES_CD_2 in ['SE', 'SW', 'S']:
                                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'C-3', None
                                     else:
-                                        if self.season == 'Dormant':
+                                        if self.season == 'dormant':
                                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'M-1', 40
                                         else:
                                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'M-2', 40
                                 ##### DOMINANT CONIFER = OTHER FIR
                                 elif self.SPECIES_CD_1 in ['B', 'BL']:
                                     if self.COAST_INTERIOR_CD == 'C':
-                                        if self.season == 'Dormant':
+                                        if self.season == 'dormant':
                                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'M-1', 40
                                         else:
                                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'M-2', 40
@@ -1565,12 +1567,12 @@ class FuelTyping:
                     if self.dist_lag <= 1:
                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'N', None
                     elif self.dist_lag <= 3:
-                        if self.season == 'Dormant':
+                        if self.season == 'dormant':
                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-1', None
                         else:
                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-2', None
                     else:  # self.dist_lag <= 10:
-                        if self.season == 'Dormant':
+                        if self.season == 'dormant':
                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1a', None
                         else:
                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1b', None
@@ -1596,12 +1598,12 @@ class FuelTyping:
                             elif self.harv_lag <= 24:
                                 if (self.BEC_ZONE_CODE in ['CWH', 'MH']) or (
                                         self.BEC_ZONE_CODE == 'ICH' and self.dry_wet == 'wet'):
-                                    if self.season == 'Dormant':
+                                    if self.season == 'dormant':
                                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-1', None
                                     else:
                                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-2', None
                                 else:  # (self.BEC_ZONE_CODE in self.dryBECzones) or (self.dry_wet == 'dry'):
-                                    if self.season == 'Dormant':
+                                    if self.season == 'dormant':
                                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1a', None
                                     else:
                                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1b', None
@@ -1609,13 +1611,13 @@ class FuelTyping:
                                 if self.BEC_ZONE_CODE in ['CMA', 'IMA']:
                                     return inspect.getframeinfo(inspect.currentframe()).lineno, 'N', None
                                 elif self.BEC_ZONE_CODE == 'BAFA':
-                                    if self.season == 'Dormant':
+                                    if self.season == 'dormant':
                                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-1', None
                                     else:
                                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-2', None
                                 elif self.BEC_ZONE_CODE == 'CWH':
                                     if self.dry_wet == 'dry':
-                                        if self.season == 'Dormant':
+                                        if self.season == 'dormant':
                                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'M-1', 40
                                         else:
                                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'M-2', 40
@@ -1624,7 +1626,7 @@ class FuelTyping:
                                 elif self.BEC_ZONE_CODE == 'BWBS':
                                     return inspect.getframeinfo(inspect.currentframe()).lineno, 'C-2', None
                                 elif self.BEC_ZONE_CODE == 'SWB':
-                                    if self.season == 'Dormant':
+                                    if self.season == 'dormant':
                                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'M-1', 50
                                     else:
                                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'M-2', 50
@@ -1640,17 +1642,17 @@ class FuelTyping:
                                     else:  # self.dry_wet == 'wet':
                                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'C-3', None
                                 elif self.BEC_ZONE_CODE == 'PP':
-                                    if self.season == 'Dormant':
+                                    if self.season == 'dormant':
                                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1a', None
                                     else:
                                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1b', None
                                 elif self.BEC_ZONE_CODE == 'BG':
-                                    if self.season == 'Dormant':
+                                    if self.season == 'dormant':
                                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1a', None
                                     else:
                                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1b', None
                                 elif self.BEC_ZONE_CODE == 'MH':
-                                    if self.season == 'Dormant':
+                                    if self.season == 'dormant':
                                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-1', None
                                     else:
                                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-2', None
@@ -1674,12 +1676,12 @@ class FuelTyping:
                                 return inspect.getframeinfo(inspect.currentframe()).lineno, 'S-1', None
                             elif self.harv_lag <= 24:
                                 if self.BEC_ZONE_CODE in ['CWH', 'MH', 'ICH']:
-                                    if self.season == 'Dormant':
+                                    if self.season == 'dormant':
                                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-1', None
                                     else:
                                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-2', None
                                 else:  # (self.BEC_ZONE_CODE in self.dryBECzones) or (self.dry_wet == 'dry'):
-                                    if self.season == 'Dormant':
+                                    if self.season == 'dormant':
                                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1a', None
                                     else:
                                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1b', None
@@ -1687,13 +1689,13 @@ class FuelTyping:
                                 if self.BEC_ZONE_CODE in ['CMA', 'IMA']:
                                     return inspect.getframeinfo(inspect.currentframe()).lineno, 'N', None
                                 elif self.BEC_ZONE_CODE == 'BAFA':
-                                    if self.season == 'Dormant':
+                                    if self.season == 'dormant':
                                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-1', None
                                     else:
                                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-2', None
                                 elif self.BEC_ZONE_CODE == 'CWH':
                                     if self.dry_wet == 'dry':
-                                        if self.season == 'Dormant':
+                                        if self.season == 'dormant':
                                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'M-1', 40
                                         else:
                                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'M-2', 40
@@ -1702,7 +1704,7 @@ class FuelTyping:
                                 elif self.BEC_ZONE_CODE == 'BWBS':
                                     return inspect.getframeinfo(inspect.currentframe()).lineno, 'C-2', None
                                 elif self.BEC_ZONE_CODE == 'SWB':
-                                    if self.season == 'Dormant':
+                                    if self.season == 'dormant':
                                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'M-1', 25
                                     else:
                                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'M-2', 25
@@ -1716,22 +1718,22 @@ class FuelTyping:
                                     if self.dry_wet == 'dry':
                                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'C-7', None
                                     else:  # self.dry_wet == 'wet':
-                                        if self.season == 'Dormant':
+                                        if self.season == 'dormant':
                                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'M-1', 50
                                         else:
                                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'M-2', 50
                                 elif self.BEC_ZONE_CODE == 'PP':
-                                    if self.season == 'Dormant':
+                                    if self.season == 'dormant':
                                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1a', None
                                     else:
                                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1b', None
                                 elif self.BEC_ZONE_CODE == 'BG':
-                                    if self.season == 'Dormant':
+                                    if self.season == 'dormant':
                                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1a', None
                                     else:
                                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1b', None
                                 elif self.BEC_ZONE_CODE == 'MH':
-                                    if self.season == 'Dormant':
+                                    if self.season == 'dormant':
                                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-1', None
                                     else:
                                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-2', None
@@ -1744,7 +1746,7 @@ class FuelTyping:
                                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'C-5', None
                                 elif self.BEC_ZONE_CODE == 'ICH':
                                     if self.dry_wet == 'dry':
-                                        if self.season == 'Dormant':
+                                        if self.season == 'dormant':
                                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'M-1', 40
                                         else:
                                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'M-2', 40
@@ -1759,12 +1761,12 @@ class FuelTyping:
                             if self.BEC_ZONE_CODE in ['CMA', 'IMA']:
                                 return inspect.getframeinfo(inspect.currentframe()).lineno, 'N', None
                             elif self.BEC_ZONE_CODE in ['CWH', 'MH', 'ICH', 'BAFA']:
-                                if self.season == 'Dormant':
+                                if self.season == 'dormant':
                                     return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-1', None
                                 else:
                                     return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-2', None
                             else:
-                                if self.season == 'Dormant':
+                                if self.season == 'dormant':
                                     return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1a', None
                                 else:
                                     return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1b', None
@@ -1772,12 +1774,12 @@ class FuelTyping:
                             if self.INVENTORY_STANDARD_CD == 'F':
                                 if self.NON_PRODUCTIVE_CD in [11, 12, 13]:
                                     if self.BEC_ZONE_CODE in ['CWH', 'MH', 'ICH']:
-                                        if self.season == 'Dormant':
+                                        if self.season == 'dormant':
                                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-1', None
                                         else:
                                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-2', None
                                     else:  # (self.BEC_ZONE_CODE in self.dryBECzones) or (self.dry_wet == 'dry'):
-                                        if self.season == 'Dormant':
+                                        if self.season == 'dormant':
                                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1a', None
                                         else:
                                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1b', None
@@ -1786,7 +1788,7 @@ class FuelTyping:
                                 elif self.NON_PRODUCTIVE_CD == 42:
                                     return inspect.getframeinfo(inspect.currentframe()).lineno, 'N', None
                                 elif self.NON_PRODUCTIVE_CD in [60, 62, 63]:
-                                    if self.season == 'Dormant':
+                                    if self.season == 'dormant':
                                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1a', None
                                     else:
                                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1b', None
@@ -1794,12 +1796,12 @@ class FuelTyping:
                                     if self.BEC_ZONE_CODE in ['CMA', 'IMA']:
                                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'N', None
                                     elif self.BEC_ZONE_CODE in ['CWH', 'MH', 'ICH']:
-                                        if self.season == 'Dormant':
+                                        if self.season == 'dormant':
                                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-1', None
                                         else:
                                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-2', None
                                     else:  # (self.BEC_ZONE_CODE in self.dryBECzones) or (self.dry_wet == 'dry'):
-                                        if self.season == 'Dormant':
+                                        if self.season == 'dormant':
                                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1a', None
                                         else:
                                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1b', None
@@ -1809,12 +1811,12 @@ class FuelTyping:
                                 if self.LAND_COVER_CLASS_CD_1 in ['LA', 'RE', 'RI', 'OC']:
                                     return inspect.getframeinfo(inspect.currentframe()).lineno, 'W', None
                                 elif self.LAND_COVER_CLASS_CD_1 == 'HG':
-                                    if self.season == 'Dormant':
+                                    if self.season == 'dormant':
                                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1a', None
                                     else:
                                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1b', None
                                 elif self.LAND_COVER_CLASS_CD_1 in ['BY', 'BM', 'BL']:
-                                    if self.season == 'Dormant':
+                                    if self.season == 'dormant':
                                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-1', None
                                     else:
                                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-2', None
@@ -1822,12 +1824,12 @@ class FuelTyping:
                                     if self.BEC_ZONE_CODE in ['CMA', 'IMA']:
                                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'N', None
                                     elif self.BEC_ZONE_CODE in ['CWH', 'MH', 'ICH']:
-                                        if self.season == 'Dormant':
+                                        if self.season == 'dormant':
                                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-1', None
                                         else:
                                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-2', None
                                     else:  # (self.BEC_ZONE_CODE in self.dryBECzones) or (self.dry_wet == 'dry'):
-                                        if self.season == 'Dormant':
+                                        if self.season == 'dormant':
                                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1a', None
                                         else:
                                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1b', None
