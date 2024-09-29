@@ -822,7 +822,6 @@ class FuelTyping:
                                             return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-2', None
                             #### PURE TRUE FIR STANDS
                             elif self.SPECIES_CD_1.startswith('B'):
-                                # print('Made it to pure true fir') # FOR ERROR CHECKING
                                 if self.SPECIES_CD_1 == 'BG':
                                     return inspect.getframeinfo(inspect.currentframe()).lineno, 'C-7', None
                                 elif self.SPECIES_CD_1 == 'BA':

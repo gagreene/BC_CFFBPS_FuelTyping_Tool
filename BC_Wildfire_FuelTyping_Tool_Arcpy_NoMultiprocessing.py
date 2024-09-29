@@ -1,21 +1,11 @@
-# -*- coding: utf-8 -*-
 __author__ = ['Gregory A. Greene, map.n.trowel@gmail.com']
 
-import os
-import time
-from datetime import datetime
 import PySimpleGUI as sg
 import bcwft2018
-import fiona
+import os
 import pandas as pd
 import numpy as np
-import geopandas as gpd
-import ProcessFeatures as pf
-import multiprocessing as mp
-from multiprocessing import current_process, Value, Lock
-import traceback
-import warnings
-from typing import Union
+
 
 coastInteriorToolTip = '''A code indicating that the stand is located in the Coast or Interior Region of the Province.
 The Coast Region is defined as the mainland west of the Cascade and Coast Mountains, including the off-shore
@@ -49,15 +39,15 @@ V = Vegetation Resources Inventory (VRI)
 F = Forest Inventory Planning (FIP)
 I = Incomplete (when a full set of VRI attributes is not collected)
 L = Landscape Vegetation Inventory (LVI)'''
-landCoverClassCodeToolTip = '''The Land Cover Class Code describes the first most dominate land cover type by percent 
-area occupied within the polygon that contribute to the overall polygon description, but may be too small to be
+landCoverClassCodeToolTip = '''The Land Cover Class Code describes the first most dominate land cover type by percent area
+occupied within the polygon that contribute to the overall polygon description, but may be too small to be
 spatially identified. The sub-division of a polygon by a quantified Land Cover Component, allowing non-
 spatial resolution for modeling of wildlife habitat capability.
 
 NON-VEGETATED:\t\tVEGETATED:\t\t\tWATER COVER:
 SI = Snow/ice\t\t\tTB = Treed Broadleaf\t\tLA = Lake
 GL = Glacier\t\t\tTC = Treed Coniferous\t\tRE = Reservoir
-PN = Snow cover\t\t\tTM = Treed Mixed\t\tRI = River/stream
+PN = Snow cover\t\t\tTM = Treed Mixed\t\tRI = River\stream
 RO = Rock/rubble\t\t\tST = Shrub Tall\t\t\tOC = Ocean
 BR = Bedrock\t\t\tSL = Shrub Low
 TA = Talus\t\t\tHE = Herb
@@ -83,14 +73,14 @@ UR = Urban
 AP = Airport
 MI = Open pit mine
 OT = Other'''
-nonVegCoverTypeToolTip = '''Non-vegetated cover type is the designation for the predominate observable non-vegetated 
-land cover within the site. Non-vegetated cover types provide detailed reporting for non-vegetated land cover.
+nonVegCoverTypeToolTip = '''Non-vegetated cover type is the designation for the predominate observable non-vegetated land cover
+within the site. Non-vegetated cover types provide detailed reporting for non-vegetated land cover.
 
 LAND COVER:\t\t\tWATER COVER:
 GL = Glacier\t\t\tOT = Other
 PN = Snow cover\t\t\tLA = Lake
 BR = Bedrock\t\t\tRE = Reservoir
-TA = Talus\t\t\tRI = River/stream
+TA = Talus\t\t\tRI = River\stream
 BL = Blockfield\t\t\tDW = Downwood
 MZ = Rubbly mine spoils\t\tOC = Ocean
 LB = Lava bed
@@ -121,12 +111,17 @@ SP = Sparse
     sites.'''
 
 
-def isNumber(s: str) -> bool:
-    """
-    Function to determine if a string is a number
-    :param s: input string object
-    :return: True or False
-    """
+def csvToDF(inPath, inCols=None, header=None, asList=None):
+    df = pd.read_csv(inPath, usecols=inCols, header=header)
+    df = df.reindex(columns=inCols)
+
+    if asList:
+        return df.values.tolist()
+    else:
+        return df
+
+
+def isNumber(s):
     try:
         float(f'{s}')
         return True
@@ -134,18 +129,7 @@ def isNumber(s: str) -> bool:
         return False
 
 
-def valuesValid(inValues: dict,
-                treeList: list,
-                becZones: list,
-                becSubzones: list) -> Union[bool, str]:
-    """
-    Function to validate input values
-    :param inValues: A dictionary of input values to compare
-    :param treeList: A list of tree species
-    :param becZones: A list of BEC zones
-    :param becSubzones: A list of BEC subzones
-    :return: False if no errors found. A string containing the errors otherwise.
-    """
+def valuesValid(inValues, treeList, becZones, becSubzones):
     try:
         errorList = []
 
@@ -204,77 +188,19 @@ def valuesValid(inValues: dict,
         return 'ERROR: Unable to assess validity of input data'
 
 
-def read_and_process_features(process_all: bool,
-                              feature_slice: slice,
-                              season: str,
-                              fields_to_extract: list,
-                              gdb_path: str,
-                              feature_class: str,
-                              counter: Value,
-                              lock: Lock) -> gpd.GeoDataFrame:
-    """
-    Function to read data from the feature class, filter the fields, and run the fuel typing algorithm
-    :param process_all: If True, process all features. If false, only process features without "FuelType" values
-    :param feature_slice: A slice representing the rows to process in the VRI dataset
-    :param season: season for fuel typing assignments. Options: "growing", "dormant"
-    :param fields_to_extract: the fields in the VRI dataset that are needed for BCWFT fuel typing
-    :param gdb_path: path to the gdb containing the VRI dataset
-    :param feature_class: name of the VRI feature class
-    :param counter: the shared multiprocessing counter object to track the number of features processed
-    :param lock: the shared multiprocessing lock object
-    :return: a geopandas GeoDataframe object containing the fuel type data for the current feature slice
-    """
-    process_id = current_process().name
-    print(f'\t[{process_id}] Processing chunk: {feature_slice}')
-
-    # Add "geometry" to the extract fields to ensure the shapes are carried through
-    fields_to_extract.append('geometry')
-
-    # Get a geodataframe object of the current VRI feature slice
-    with warnings.catch_warnings():
-        warnings.simplefilter('ignore')
-        slice_gdf = gpd.read_file(gdb_path, layer=feature_class, columns=fields_to_extract, rows=feature_slice)
-
-    # Ensure all values in the EARLIEST_NONLOGGING_DIST_DATE column are datetime objects
-    slice_gdf['EARLIEST_NONLOGGING_DIST_DATE'] = pd.to_datetime(slice_gdf['EARLIEST_NONLOGGING_DIST_DATE'],
-                                                                errors='coerce')
-
-    # Reorder the columns
-    slice_gdf = slice_gdf[fields_to_extract]
-
-    # Instantiate the bcwft2018 FuelTyping class
-    bcwft = bcwft2018.FuelTyping()
-
-    # Run fuel typing
-    if process_all:
-        # Add the BCWFT fields to the geodataframe
-        slice_gdf[['BCWFT_rowRef', 'FuelType', 'FT_Modifier']] = None
-        # Get the fuel types
-        for index, row in slice_gdf.iterrows():
-            (slice_gdf.at[index, 'BCWFT_rowRef'],
-             slice_gdf.at[index, 'FuelType'],
-             slice_gdf.at[index, 'FT_Modifier']) = bcwft.getFuelType(season, *row[:-4])
-    else:
-        # Get a subset of slice_gdf that contains no data values
-        partial_gdf = slice_gdf[slice_gdf['FuelType'].isna()]
-        # Get the fuel types
-        for index, row in partial_gdf.iterrows():
-            (partial_gdf.at[index, 'BCWFT_rowRef'],
-             partial_gdf.at[index, 'FuelType'],
-             partial_gdf.at[index, 'FT_Modifier']) = bcwft.getFuelType(season, *row[:-4])
-        # Add the new data to the geodataframe
-        slice_gdf.update(partial_gdf)
-
-    # Update the counter in a thread-safe manner
-    with lock:
-        counter.value += len(slice_gdf)
-
-    return slice_gdf
-
-
 def main():
     # Remove stale tasks and set initial values for tool functions
     # sg.theme('DarkAmber')   # Add a touch of color if desired (other themes available)
+    """
+    refList = ['BCWFT_rowRef', 'FuelType','FT_Modifier','COAST_INTERIOR_CD','INVENTORY_STANDARD_CD',
+               'BCLCS_LEVEL_1','BCLCS_LEVEL_2','BCLCS_LEVEL_3','BCLCS_LEVEL_4','BCLCS_LEVEL_5',
+               'BEC_ZONE_CODE','BEC_SUBZONE',
+               'EARLIEST_NONLOGGING_DIST_TYPE','EARLIEST_NONLOGGING_DIST_DATE','HARVEST_DATE',
+               'CROWN_CLOSURE','PROJ_HEIGHT_1','PROJ_AGE_1','VRI_LIVE_STEMS_PER_HA','VRI_DEAD_STEMS_PER_HA',
+               'STAND_PERCENTAGE_DEAD','NON_VEG_COVER_TYPE_1','NON_PRODUCTIVE_CD','LAND_COVER_CLASS_CD_1',
+               'SPECIES_CD_1', 'SPECIES_PCT_1','SPECIES_CD_2', 'SPECIES_PCT_2','SPECIES_CD_3', 'SPECIES_PCT_3',
+               'SPECIES_CD_4', 'SPECIES_PCT_4','SPECIES_CD_5', 'SPECIES_PCT_5','SPECIES_CD_6', 'SPECIES_PCT_6']
+    """
     bcwft = bcwft2018.FuelTyping()
     treeList = bcwft.treeList
     fldList = bcwft.fldList
@@ -415,9 +341,8 @@ def main():
                       sg.Radio('Yes', "radioDisturbance", key='distYes', enable_events=True)],
                      [sg.T(
                          '\tMost Recent Disturbance Type: (B) Wildfire, (IBM) Mountain Pine Beetle - Lodgepole Pine Only'),
-                         sg.Combo(['B', 'IBM'], size=(4, 1), key='EARLIEST_NONLOGGING_DIST_TYPE',
-                                  background_color='white',
-                                  enable_events=True, disabled=True)],
+                      sg.Combo(['B', 'IBM'], size=(4, 1), key='EARLIEST_NONLOGGING_DIST_TYPE', background_color='white',
+                               enable_events=True, disabled=True)],
                      [sg.T('\tDisturbance Date (YYYY-MM-DD):'),
                       sg.In('', size=(11, 1), key='EARLIEST_NONLOGGING_DIST_DATE', background_color='white',
                             disabled_readonly_background_color='gray', enable_events=True, disabled=True),
@@ -444,10 +369,8 @@ def main():
                   background_color='white', enable_events=True, disabled=True)],
         [sg.T('')],
         [sg.T('Modelling Options:'),
-         sg.Radio('Process Entire VRI Dataset', "radioProcessData", key='doAllData', default=True),
-         sg.Radio('Process Unclassified Data Only', "radioProcessData", key='doNullData')],
-        [sg.T('Number of Processors for Multiprocessing:'),
-         sg.In('1', size=(10, 1), key='num_processors', background_color='white', enable_events=True)],
+         sg.Radio('Process Entire VRI Dataset', "radioProcessData", key='doAllData'),
+         sg.Radio('Process Unclassified Data Only', "radioProcessData", key='doNullData', default=True)],
         [sg.Button('Model Fuel Types', disabled=True)],
         [sg.T('')],
         [sg.T('')],
@@ -519,9 +442,9 @@ def main():
             inputError = valuesValid(values, treeList, becZones, becSubzones)
             if not inputError:
                 if 'Growing' in values['standSeason']:
-                    season = 'growing'
+                    season = 'Growing'
                 else:
-                    season = 'dormant'
+                    season = 'Dormant'
 
                 for i in fldList:
                     if (i in df.columns) and (i in values):
@@ -570,7 +493,11 @@ def main():
             window['ftOut'].update('')
 
         if event == 'folderIn' or event == 'inVRI_Source':
-            ftList = pf.listLayersInGDB(values['inVRI_Source'])
+            import arcpy
+            from arcpy import env
+
+            env.workspace = values['inVRI_Source']
+            ftList = arcpy.ListFeatureClasses(feature_type='Polygon')
 
             if ftList is not None:
                 window['inVRI'].update(values=ftList)
@@ -587,112 +514,94 @@ def main():
 
         if event == 'vriSeason':
             if 'Growing' in values['vriSeason']:
-                season = 'growing'
+                season = 'Growing'
             else:
-                season = 'dormant'
+                season = 'Dormant'
 
             window['Model Fuel Types'].update(disabled=False)
 
         if event == 'Model Fuel Types':
-            if not values['num_processors'] != '':
-                try:
-                    int(values['num_processors'])
-                except Exception:
-                    sg.popup('Number of Processors must be an integer value')
-                if int(values['num_processors']) > mp.cpu_count:
-                    window['inVRI'].update(f'{mp.cpu_count}')
-            else:
-                try:
-                    # Start timer
-                    start = time.time()
+            try:
+                arcpy.Delete_management('in_memory')
+                arcpy.ClearWorkspaceCache_management()
 
-                    # Get the necessary input parameters
-                    gdb_path = values['inVRI_Source']
-                    feature_class = values['inVRI'][0]
-                    output_feature_class = os.path.join(gdb_path, feature_class + '_FuelTypes')
-                    output_gpkg = os.path.join(os.path.dirname(gdb_path), feature_class + '_FuelTypes.gpkg')
-                    num_processors = int(values['num_processors'])
+                print('Importing the VRI dataset')
+                vri = 'in_memory\\vri'
+                arcpy.MakeFeatureLayer_management(
+                    os.path.join(values['inVRI_Source'], values['inVRI'][0]),
+                    vri
+                )
+                fldLst = arcpy.ListFields(vri)
 
-                    # Get the number of features in the VRI dataset
-                    with fiona.open(fp=gdb_path, layer=feature_class) as src:
-                        total_features = len(src)
-                        schema = src.schema
-                        columns = list(schema['properties'].keys())
+                # Add or reset BCWFT_rowRef field
+                if 'BCWFT_rowRef' not in fldLst:
+                    print('Adding "BCWFT_rowRef" field to VRI dataset')
+                    arcpy.AddField_management(vri, 'BCWFT_rowRef', 'TEXT')
+                elif values['doAllData']:
+                    arcpy.CalculateField_management(vri, 'BCWFT_rowRef', None)
 
-                    if values['doAllData']:
-                        process_all = True
-                        valid_data = True
-                        fields_to_extract = fldList[3:]
-                    elif values['doNullData']:
-                        if any(column in columns for column in fldList[:3]):
-                            process_all = False
-                            valid_data = True
-                            fields_to_extract = fldList
+                # Add or reset FuelType field
+                if 'FuelType' not in fldLst:
+                    print('Adding "FuelType" field to VRI dataset')
+                    arcpy.AddField_management(vri, 'FuelType', 'TEXT')
+                elif values['doAllData']:
+                    arcpy.CalculateField_management(vri, 'FuelType', None)
+
+                # Add or reset FT_Modifier field
+                if 'FT_Modifier' not in fldLst:
+                    print('Adding "FT_Modifier" field to VRI dataset')
+                    arcpy.AddField_management(vri, 'FT_Modifier', 'TEXT')
+                elif values['doAllData']:
+                    arcpy.CalculateField_management(vri, 'FT_Modifier', None)
+
+                vriTableView = 'in_memory\\vriTableView'
+
+                if arcpy.Exists(vriTableView):
+                    print('Deleting old TableView of VRI dataset')
+                    arcpy.Delete_management(vriTableView)
+
+                print('Creating TableView of VRI dataset')
+                arcpy.MakeTableView_management(vri, vriTableView)
+                BAR_MAX = int(arcpy.GetCount_management(vriTableView).getOutput(0))
+
+                if values['doNullData']:
+                    print('Selecting features without Fuel Type assignments')
+                    where_clause = """FuelType IS NULL"""
+                    arcpy.SelectLayerByAttribute_management(vriTableView, 'NEW_SELECTION', where_clause)
+                    REMAINING = int(arcpy.GetCount_management(vriTableView).getOutput(0))
+                elif values['doAllData']:
+                    REMAINING = BAR_MAX
+
+                with arcpy.da.UpdateCursor(vriTableView, fldList) as cursor:
+                    print('Assigning Fuel Types')
+                    for count, row in enumerate(cursor):
+                        fuelData = bcwft.getFuelType(season, row)
+                        if fuelData is not None:
+                            row[0], row[1], row[2] = fuelData
                         else:
-                            valid_data = False
+                            row[0], row[1], row[2] = None, 'NoMatchingFuelType_ERROR', None
+                        cursor.updateRow(row)
+                        PROGRESS = ((BAR_MAX - REMAINING) / BAR_MAX) + (count / REMAINING)
+                        window['featCountProg'].update(f'{REMAINING - count} Features Remaining')
+                        window['progBar'].update(PROGRESS)
+                        window['progPcnt'].update(f'{round(100 * PROGRESS, 1)}%')
 
-                    if valid_data:
-                        # Set up the feature slices for the dataset
-                        slice_size = 5000
-                        feature_slices = [slice(i, min(i + slice_size, total_features)) for i in
-                                          range(0, total_features, slice_size)]
+                if values['doNullData']:
+                    arcpy.SelectLayerByAttribute_management(vri, 'CLEAR_SELECTION')
 
-                        # Initialize the counter and lock
-                        counter = mp.Manager().Value('i', 0)  # use Manager to create a shared counter
-                        lock = mp.Manager().Lock()  # use Manager to create a shared lock
-
-                        # Add input parameters to args
-                        args = [(process_all, feature_slice, season, fields_to_extract,
-                                 gdb_path, feature_class, counter, lock)
-                                for feature_slice in feature_slices]
-
-                        print('Reading the VRI Dataset and Assigning Fuel Types')
-                        with mp.Pool(num_processors) as pool:
-                            result_async = pool.starmap_async(read_and_process_features, args)
-
-                            # Periodically print the counter value while workers are running
-                            while not result_async.ready():
-                                time.sleep(1)  # Wait for 5 seconds between updates
-                                BAR_MAX = total_features
-                                REMAINING = total_features
-                                # Track progress
-                                PROGRESS = ((BAR_MAX - REMAINING) / BAR_MAX) + (counter.value / REMAINING)
-                                window['featCountProg'].update(f'{REMAINING - counter.value} Features Remaining')
-                                window['progBar'].update(PROGRESS)
-                                window['progPcnt'].update(f'{round(100 * PROGRESS, 1)}%')
-
-                            # Wait for all workers to complete
-                            geo_dataframes = result_async.get()
-
-                        merged_gdf = gpd.GeoDataFrame(pd.concat(geo_dataframes, ignore_index=True))
-
-                        with fiona.open(gdb_path, layer=feature_class) as src:
-                            crs = src.crs
-                        merged_gdf.crs = crs
-
-                        try:
-                            merged_gdf.to_file(output_feature_class, driver='FileGDB')
-                        except Exception:
-                            merged_gdf.to_file(output_gpkg, driver='GPKG')
-
-                        # DELETE TEMPORARY DATA
-                        del BAR_MAX, REMAINING, PROGRESS
-
-                        # End timer
-                        end = time.time()
-                        print(f'Fuel typing finished at: {datetime.now().strftime("%H:%M:%S")}')
-
-                        # Print elapsed time
-                        total_time = round((end - start) / 60, 3)
-                        print(f'Fuel typing completed in: {total_time} minutes')
-                        sg.popup(f'Fuel typing complete!\nFinished in: {total_time} minutes')
-                    else:
-                        sg.popup(f'None of the necessary Fuel Typing fields\n{fldList[:3]}\nare in the dataset.\n'
-                                 'You must process the entire dataset.')
-                        window['doAllData'].update(True)
-
-                except Exception:
-                    print(traceback.format_exc())
+                # DELETE TEMPORARY DATA
+                del BAR_MAX, REMAINING, PROGRESS
+                del count, vriTableView
+                arcpy.Delete_management('in_memory')
+                arcpy.ClearWorkspaceCache_management()
+            except arcpy.ExecuteError:
+                # Get the tool error messages
+                msgs = arcpy.GetMessages(2)
+                # Return tool error messages for use with a script tool
+                arcpy.AddError(msgs)
+            except:
+                arcpy.Delete_management('in_memory')
+                arcpy.ClearWorkspaceCache_management()
 
         if (event is None) or (event == 'Close Program'):  # if user closes window or clicks close program
             break
