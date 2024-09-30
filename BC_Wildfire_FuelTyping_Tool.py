@@ -13,9 +13,10 @@ import geopandas as gpd
 import ProcessFeatures as pf
 import multiprocessing as mp
 from multiprocessing import current_process, Value, Lock
-import traceback
-import warnings
 from typing import Union
+import traceback
+import logging
+import warnings
 
 coastInteriorToolTip = '''A code indicating that the stand is located in the Coast or Interior Region of the Province.
 The Coast Region is defined as the mainland west of the Cascade and Coast Mountains, including the off-shore
@@ -227,17 +228,16 @@ def read_and_process_features(process_all: bool,
     process_id = current_process().name
     print(f'\t[{process_id}] Processing chunk: {feature_slice}')
 
-    # Add "geometry" to the extract fields to ensure the shapes are carried through
-    fields_to_extract.append('geometry')
-
     # Get a geodataframe object of the current VRI feature slice
     with warnings.catch_warnings():
         warnings.simplefilter('ignore')
         slice_gdf = gpd.read_file(gdb_path, layer=feature_class, columns=fields_to_extract, rows=feature_slice)
 
-    # Ensure all values in the EARLIEST_NONLOGGING_DIST_DATE column are datetime objects
+    # Ensure all values in date columns are datetime objects
     slice_gdf['EARLIEST_NONLOGGING_DIST_DATE'] = pd.to_datetime(slice_gdf['EARLIEST_NONLOGGING_DIST_DATE'],
                                                                 errors='coerce')
+    slice_gdf['HARVEST_DATE'] = pd.to_datetime(slice_gdf['HARVEST_DATE'],
+                                               errors='coerce')
 
     # Reorder the columns
     slice_gdf = slice_gdf[fields_to_extract]
@@ -251,9 +251,25 @@ def read_and_process_features(process_all: bool,
         slice_gdf[['BCWFT_rowRef', 'FuelType', 'FT_Modifier']] = None
         # Get the fuel types
         for index, row in slice_gdf.iterrows():
-            (slice_gdf.at[index, 'BCWFT_rowRef'],
-             slice_gdf.at[index, 'FuelType'],
-             slice_gdf.at[index, 'FT_Modifier']) = bcwft.getFuelType(season, *row[:-4])
+            try:
+                result = bcwft.getFuelType(season, *row[:32])
+                if not isinstance(result, type(None)):
+                    slice_gdf.at[index, 'BCWFT_rowRef'] = result[0]
+                    slice_gdf.at[index, 'FuelType'] = result[1]
+                    slice_gdf.at[index, 'FT_Modifier'] = result[2]
+                else:
+                    slice_gdf.at[index, 'BCWFT_rowRef'] = None
+                    slice_gdf.at[index, 'FuelType'] = 'NoneTypeReturn-ERROR'
+                    slice_gdf.at[index, 'FT_Modifier'] = None
+            except Exception as err:
+                # Assign FuelType as error
+                slice_gdf.at[index, 'FuelType'] = 'FuelTyping-Error'
+                # Print error messages
+                print(row, feature_slice)
+                print(f'An exception occurred: {err}')
+                print(logging.error(traceback.format_exc()))
+                # Allow the code to continue
+                pass
     else:
         # Get a subset of slice_gdf that contains no data values
         partial_gdf = slice_gdf[slice_gdf['FuelType'].isna()]
@@ -261,7 +277,7 @@ def read_and_process_features(process_all: bool,
         for index, row in partial_gdf.iterrows():
             (partial_gdf.at[index, 'BCWFT_rowRef'],
              partial_gdf.at[index, 'FuelType'],
-             partial_gdf.at[index, 'FT_Modifier']) = bcwft.getFuelType(season, *row[:-4])
+             partial_gdf.at[index, 'FT_Modifier']) = bcwft.getFuelType(season, *row[:32])
         # Add the new data to the geodataframe
         slice_gdf.update(partial_gdf)
 
@@ -642,7 +658,7 @@ def main():
                         lock = mp.Manager().Lock()  # use Manager to create a shared lock
 
                         # Add input parameters to args
-                        args = [(process_all, feature_slice, season, fields_to_extract,
+                        args = [(process_all, feature_slice, season, fields_to_extract + ['geometry'],
                                  gdb_path, feature_class, counter, lock)
                                 for feature_slice in feature_slices]
 
@@ -652,7 +668,7 @@ def main():
 
                             # Periodically print the counter value while workers are running
                             while not result_async.ready():
-                                time.sleep(1)  # Wait for 5 seconds between updates
+                                time.sleep(1)  # Wait for 1 second between updates
                                 BAR_MAX = total_features
                                 REMAINING = total_features
                                 # Track progress

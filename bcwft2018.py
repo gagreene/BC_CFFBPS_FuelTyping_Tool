@@ -249,9 +249,13 @@ class FuelTyping:
         """
         # Get the current year
         currentYear = dt.now().year
+        if isinstance(self.HARVEST_DATE, str):
+            self.HARVEST_DATE = self.HARVEST_DATE.split('+')[0]
+            self.HARVEST_DATE = pd.to_datetime(self.HARVEST_DATE,
+                                               errors='coerce')
         if self.HARVEST_DATE is not None:
             if self.HARVEST_DATE.year > currentYear:
-                self.harv_lag = 'HARVEST_DATE-ERROR', None
+                self.harv_lag = 0
             else:
                 # Calculate difference between harvest date and current year
                 self.harv_lag = currentYear - pd.to_datetime(self.HARVEST_DATE, format='%Y-%m-%d').year
@@ -268,14 +272,17 @@ class FuelTyping:
         """
         ## Determine number of years since burn
         currentYear = dt.now().year
+        if isinstance(self.EARLIEST_NONLOGGING_DIST_DATE, str):
+            self.EARLIEST_NONLOGGING_DIST_DATE = self.EARLIEST_NONLOGGING_DIST_DATE.split('+')[0]
+            self.EARLIEST_NONLOGGING_DIST_DATE = pd.to_datetime(self.EARLIEST_NONLOGGING_DIST_DATE,
+                                                                errors='coerce')
         if self.EARLIEST_NONLOGGING_DIST_DATE is not None:
             if self.EARLIEST_NONLOGGING_DIST_DATE.year > currentYear:
-                self.dist_lag = 'EARLIEST_NONLOGGING_DIST_DATE-ERROR'
+                self.dist_lag = 0
             else:
                 self.dist_lag = currentYear - self.EARLIEST_NONLOGGING_DIST_DATE.year
         else:
             self.dist_lag = None
-        del currentYear
 
         return
 
@@ -287,33 +294,31 @@ class FuelTyping:
         # Create pandas DataFrame if inData isn't one
         pct_cnfr = 0
         # If species code is a conifer, add its percentage to sum
-        if (self.SPECIES_CD_1 is not None) and (self.SPECIES_PCT_1 is not None) and (
+        if (self.SPECIES_CD_1 is not None) and (type(self.SPECIES_PCT_1) in (int, float, complex)) and (
                 self.SPECIES_CD_1 in self.coniferList):
             pct_cnfr += self.SPECIES_PCT_1
-        if (self.SPECIES_CD_2 is not None) and (self.SPECIES_PCT_2 is not None) and (
+        if (self.SPECIES_CD_2 is not None) and (type(self.SPECIES_PCT_2) in (int, float, complex)) and (
                 self.SPECIES_CD_2 in self.coniferList):
             pct_cnfr += self.SPECIES_PCT_2
-        if (self.SPECIES_CD_3 is not None) and (self.SPECIES_PCT_3 is not None) and (
+        if (self.SPECIES_CD_3 is not None) and (type(self.SPECIES_PCT_3) in (int, float, complex)) and (
                 self.SPECIES_CD_3 in self.coniferList):
             pct_cnfr += self.SPECIES_PCT_3
-        if (self.SPECIES_CD_4 is not None) and (self.SPECIES_PCT_4 is not None) and (
+        if (self.SPECIES_CD_4 is not None) and (type(self.SPECIES_PCT_4) in (int, float, complex)) and (
                 self.SPECIES_CD_4 in self.coniferList):
             pct_cnfr += self.SPECIES_PCT_4
-        if (self.SPECIES_CD_5 is not None) and (self.SPECIES_PCT_5 is not None) and (
+        if (self.SPECIES_CD_5 is not None) and (type(self.SPECIES_PCT_5) in (int, float, complex)) and (
                 self.SPECIES_CD_5 in self.coniferList):
             pct_cnfr += self.SPECIES_PCT_5
-        if (self.SPECIES_CD_6 is not None) and (self.SPECIES_PCT_6 is not None) and (
+        if (self.SPECIES_CD_6 is not None) and (type(self.SPECIES_PCT_6) in (int, float, complex)) and (
                 self.SPECIES_CD_6 in self.coniferList):
             pct_cnfr += self.SPECIES_PCT_6
 
         # Change pct_cnfr to 100% if it evaluates to >100%
-        if pct_cnfr is not None and pct_cnfr > 100:
+        if pct_cnfr > 100:
             pct_cnfr = 100
 
         # Assign final value to self.pct_cnfr
         self.pct_cnfr = pct_cnfr
-
-        del pct_cnfr
 
         return
 
@@ -490,9 +495,9 @@ class FuelTyping:
             #### SITE FORESTED
             if self.is_forested:
                 #### SITE RECENTLY BURNED
-                if self.is_burned and self.dist_lag is not None and self.dist_lag <= 10:
-                    if self.pct_cnfr is not None and self.pct_cnfr >= 60:
-                        if self.CROWN_CLOSURE is not None and self.CROWN_CLOSURE > 40:
+                if self.is_burned and (self.dist_lag is not None) and (self.dist_lag <= 10):
+                    if (self.pct_cnfr is not None) and (self.pct_cnfr >= 60):
+                        if (self.CROWN_CLOSURE is not None) and (self.CROWN_CLOSURE > 40):
                             if self.dist_lag <= 3:
                                 return inspect.getframeinfo(inspect.currentframe()).lineno, 'N', None
                             elif self.dist_lag <= 6:
@@ -526,8 +531,9 @@ class FuelTyping:
                 #### SITE NOT RECENTLY BURNED
                 else:
                     if (self.SPECIES_CD_1 is None) or (self.SPECIES_PCT_1 is None) or (self.SPECIES_PCT_1 == 0):
-                        return inspect.getframeinfo(
-                            inspect.currentframe()).lineno, 'VegForestNoBurn_Species-ERROR', None
+                        return (inspect.getframeinfo(inspect.currentframe()).lineno,
+                                'VegForestNoBurn_Species-ERROR',
+                                None)
                     #### PURE/SINGLE SPECIES STANDS
                     elif self.SPECIES_PCT_1 >= 80:
                         if self.SPECIES_CD_1 in self.coniferList:
@@ -670,7 +676,8 @@ class FuelTyping:
                                                     return inspect.getframeinfo(
                                                         inspect.currentframe()).lineno, 'C-3', None
                                                 else:  # if (self.BEC_ZONE_CODE in self.dryBECzones) or (self.BEC_ZONE_CODE == 'ICH' and self.dry_wet == 'dry'):
-                                                    if self.STAND_PERCENTAGE_DEAD is not None and self.STAND_PERCENTAGE_DEAD > 34:
+                                                    if ((self.STAND_PERCENTAGE_DEAD is not None)
+                                                            and (self.STAND_PERCENTAGE_DEAD > 34)):
                                                         return inspect.getframeinfo(
                                                             inspect.currentframe()).lineno, 'C-4', None
                                                     else:
@@ -783,11 +790,13 @@ class FuelTyping:
                                                         return inspect.getframeinfo(
                                                             inspect.currentframe()).lineno, 'C-2', None
                                                     else:
-                                                        return inspect.getframeinfo(
-                                                            inspect.currentframe()).lineno, 'VegForestPureOtherSpruceInterior_NoBCLCSLv5-ERROR', None
+                                                        return (inspect.getframeinfo(inspect.currentframe()).lineno,
+                                                                'VegForestPureOtherSpruceInterior_NoBCLCSLv5-ERROR',
+                                                                None)
                                                 else:
-                                                    return inspect.getframeinfo(
-                                                        inspect.currentframe()).lineno, 'VegForestPureOtherSpruceInterior_ProjHeight-ERROR', None
+                                                    return (inspect.getframeinfo(inspect.currentframe()).lineno,
+                                                            'VegForestPureOtherSpruceInterior_ProjHeight-ERROR',
+                                                            None)
                             #### PURE REDCEDAR, YELLOW CEDAR OR HEMLOCK STANDS
                             elif self.SPECIES_CD_1 in ['C', 'CW', 'Y', 'YC', 'H', 'HM', 'HW', 'HXM']:
                                 if self.harv_lag is not None and self.harv_lag <= 6:
@@ -844,8 +853,9 @@ class FuelTyping:
                                 else:
                                     return inspect.getframeinfo(inspect.currentframe()).lineno, 'O-1b', None
                             else:
-                                return inspect.getframeinfo(
-                                    inspect.currentframe()).lineno, 'VegForestedPureSpeciesStand_Species-ERROR', None
+                                return (inspect.getframeinfo(inspect.currentframe()).lineno,
+                                        'VegForestedPureSpeciesStand_Species-ERROR',
+                                        None)
                         else:  #### DECIDUOUS/BROADLEAF OR LARCH STAND
                             if self.season == 'dormant':
                                 return inspect.getframeinfo(inspect.currentframe()).lineno, 'D-1', None
@@ -1040,8 +1050,9 @@ class FuelTyping:
                                                         return inspect.getframeinfo(
                                                             inspect.currentframe()).lineno, 'M-2', self.pct_cnfr * 0.5
                                             else:
-                                                return inspect.getframeinfo(
-                                                    inspect.currentframe()).lineno, 'VegForestMixedSpeciesCnfrLT65_BCLCSLv5-ERROR', None
+                                                return (inspect.getframeinfo(inspect.currentframe()).lineno,
+                                                        'VegForestMixedSpeciesCnfrLT65_BCLCSLv5-ERROR',
+                                                        None)
                                     #### DOMINANT CONIFER = REDCEDAR, YELLOW CEDAR OR HEMLOCK
                                     elif self.checkDomConifers(['C', 'CW', 'Y', 'YC', 'H', 'HM', 'HW', 'HXM']):
                                         if self.season == 'dormant':
@@ -1242,20 +1253,24 @@ class FuelTyping:
                                                             if self.EARLIEST_NONLOGGING_DIST_TYPE == 'IBM':
                                                                 if self.dist_lag <= 5:
                                                                     if self.BCLCS_LEVEL_5 in ['DE']:
-                                                                        if self.STAND_PERCENTAGE_DEAD is not None and self.STAND_PERCENTAGE_DEAD > 50:
+                                                                        if ((self.STAND_PERCENTAGE_DEAD is not None)
+                                                                                and (self.STAND_PERCENTAGE_DEAD > 50)):
                                                                             return inspect.getframeinfo(
                                                                                 inspect.currentframe()).lineno, 'M-3', 65
-                                                                        elif self.STAND_PERCENTAGE_DEAD is not None and self.STAND_PERCENTAGE_DEAD >= 25:
+                                                                        elif ((self.STAND_PERCENTAGE_DEAD is not None)
+                                                                              and (self.STAND_PERCENTAGE_DEAD >= 25)):
                                                                             return inspect.getframeinfo(
                                                                                 inspect.currentframe()).lineno, 'C-2', None
                                                                         else:  # self.STAND_PERCENTAGE_DEAD < 25:
                                                                             return inspect.getframeinfo(
                                                                                 inspect.currentframe()).lineno, 'C-2', None
                                                                     else:  # self.BCLCS_LEVEL_5 in ['OP']:
-                                                                        if self.STAND_PERCENTAGE_DEAD is not None and self.STAND_PERCENTAGE_DEAD > 50:
+                                                                        if ((self.STAND_PERCENTAGE_DEAD is not None)
+                                                                                and (self.STAND_PERCENTAGE_DEAD > 50)):
                                                                             return inspect.getframeinfo(
                                                                                 inspect.currentframe()).lineno, 'M-3', 65
-                                                                        elif self.STAND_PERCENTAGE_DEAD is not None and self.STAND_PERCENTAGE_DEAD >= 25:
+                                                                        elif ((self.STAND_PERCENTAGE_DEAD is not None)
+                                                                              and (self.STAND_PERCENTAGE_DEAD >= 25)):
                                                                             return inspect.getframeinfo(
                                                                                 inspect.currentframe()).lineno, 'C-2', None
                                                                         else:  # self.STAND_PERCENTAGE_DEAD < 25:
@@ -1263,20 +1278,24 @@ class FuelTyping:
                                                                                 inspect.currentframe()).lineno, 'C-3', None
                                                                 else:  # self.dist_lag > 5:
                                                                     if self.BCLCS_LEVEL_5 in ['DE']:
-                                                                        if self.STAND_PERCENTAGE_DEAD is not None and self.STAND_PERCENTAGE_DEAD > 50:
+                                                                        if ((self.STAND_PERCENTAGE_DEAD is not None)
+                                                                                and (self.STAND_PERCENTAGE_DEAD > 50)):
                                                                             return inspect.getframeinfo(
                                                                                 inspect.currentframe()).lineno, 'C-2', None
-                                                                        elif self.STAND_PERCENTAGE_DEAD is not None and self.STAND_PERCENTAGE_DEAD >= 25:
+                                                                        elif ((self.STAND_PERCENTAGE_DEAD is not None)
+                                                                              and (self.STAND_PERCENTAGE_DEAD >= 25)):
                                                                             return inspect.getframeinfo(
                                                                                 inspect.currentframe()).lineno, 'C-2', None
                                                                         else:  # self.STAND_PERCENTAGE_DEAD < 25:
                                                                             return inspect.getframeinfo(
                                                                                 inspect.currentframe()).lineno, 'C-3', None
                                                                     else:  # self.BCLCS_LEVEL_5 in ['OP']:
-                                                                        if self.STAND_PERCENTAGE_DEAD is not None and self.STAND_PERCENTAGE_DEAD > 50:
+                                                                        if ((self.STAND_PERCENTAGE_DEAD is not None)
+                                                                                and (self.STAND_PERCENTAGE_DEAD > 50)):
                                                                             return inspect.getframeinfo(
                                                                                 inspect.currentframe()).lineno, 'C-2', None
-                                                                        elif self.STAND_PERCENTAGE_DEAD is not None and self.STAND_PERCENTAGE_DEAD >= 25:
+                                                                        elif ((self.STAND_PERCENTAGE_DEAD is not None)
+                                                                              and (self.STAND_PERCENTAGE_DEAD >= 25)):
                                                                             return inspect.getframeinfo(
                                                                                 inspect.currentframe()).lineno, 'C-3', None
                                                                         else:  # self.STAND_PERCENTAGE_DEAD < 25:
@@ -1301,7 +1320,7 @@ class FuelTyping:
                                                             inspect.currentframe()).lineno, 'C-3', None
                                 #### DOMINANT CONIFER = PONDEROSA PINE
                                 elif self.SPECIES_CD_1 in ['PY']:
-                                    if self.harv_lag is not None and self.harv_lag <= 7:
+                                    if (self.harv_lag is not None) and (self.harv_lag <= 7):
                                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'S-1', None
                                     else:  # self.harv_lag > 7:
                                         if self.PROJ_HEIGHT_1 < 4:
@@ -1358,7 +1377,8 @@ class FuelTyping:
                                                         return inspect.getframeinfo(
                                                             inspect.currentframe()).lineno, 'C-5', None
                                                     else:  # if (self.BEC_ZONE_CODE in self.dryBECzones) or (self.BEC_ZONE_CODE == 'ICH' and self.dry_wet == 'dry'):
-                                                        if self.STAND_PERCENTAGE_DEAD is not None and self.STAND_PERCENTAGE_DEAD > 34:
+                                                        if ((self.STAND_PERCENTAGE_DEAD is not None) and
+                                                                (self.STAND_PERCENTAGE_DEAD > 34)):
                                                             return inspect.getframeinfo(
                                                                 inspect.currentframe()).lineno, 'C-4', None
                                                         else:
@@ -1669,7 +1689,8 @@ class FuelTyping:
                                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'C-5', None
                                 else:
                                     return (inspect.getframeinfo(inspect.currentframe()).lineno,
-                                            'VegNonForestUnburnedLoggedGT24HasSpecies_BEC-ERROR', None)
+                                            'VegNonForestUnburnedLoggedGT24HasSpecies_BEC-ERROR',
+                                            None)
                         else:  # if self.SPECIES_CD_1 is None:
                             if self.harv_lag <= 5:
                                 return inspect.getframeinfo(inspect.currentframe()).lineno, 'S-1', None
@@ -1752,8 +1773,9 @@ class FuelTyping:
                                     else:  # self.dry_wet == 'wet':
                                         return inspect.getframeinfo(inspect.currentframe()).lineno, 'C-5', None
                                 else:
-                                    return inspect.getframeinfo(
-                                        inspect.currentframe()).lineno, 'VegNonForestUnburnedLoggedGT24NoSpecies_BEC-ERROR', None
+                                    return (inspect.getframeinfo(inspect.currentframe()).lineno,
+                                            'VegNonForestUnburnedLoggedGT24NoSpecies_BEC-ERROR',
+                                            None)
                     #### SITE NOT LOGGED
                     else:  # not isLogged(df):
                         if self.SPECIES_CD_1 is not None:
