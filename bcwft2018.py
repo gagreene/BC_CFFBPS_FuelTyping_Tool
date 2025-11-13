@@ -81,10 +81,10 @@ class FuelTyping:
                           'datetime64[ns]', 'datetime64[ns]',
                           'float64', 'float64', 'float64', 'float64',
                           'float64', 'float64',
-                          'object', 'object', 'object',
-                          'object', 'float64', 'object', 'float64',
-                          'object', 'float64', 'object', 'float64',
-                          'object', 'float64', 'object', 'float64']
+                          'object', 'int8', 'object',
+                          'str', 'float64', 'str', 'float64',
+                          'str', 'float64', 'str', 'float64',
+                          'str', 'float64', 'str', 'float64']
 
         self.treeList = ['', 'A', 'AC', 'ACB', 'ACT', 'AT', 'AX', 'B', 'BA', 'BB', 'BG', 'BL', 'BN', 'C', 'CW', 'D',
                          'DG', 'DM', 'DR', 'E', 'EA', 'EB', 'EP',
@@ -162,8 +162,8 @@ class FuelTyping:
             raise TypeError('The "STAND_PERCENTAGE_DEAD" parameter must be int or float data type.')
         if not isinstance(self.INVENTORY_STANDARD_CD, (str, type(None), type(nan))):
             raise TypeError('The "INVENTORY_STANDARD_CD" parameter must be string data type.')
-        if not isinstance(self.NON_PRODUCTIVE_CD, (str, type(None), type(nan))):
-            raise TypeError('The "NON_PRODUCTIVE_CD" parameter must be string data type.')
+        if not isinstance(self.NON_PRODUCTIVE_CD, (int, type(None), type(nan))):
+            raise TypeError('The "NON_PRODUCTIVE_CD" parameter must be integer data type.')
         if not isinstance(self.LAND_COVER_CLASS_CD_1, (str, type(None), type(nan))):
             raise TypeError('The "LAND_COVER_CLASS_CD_1" parameter must be string data type.')
         if not isinstance(self.SPECIES_CD_1, (str, type(None))):
