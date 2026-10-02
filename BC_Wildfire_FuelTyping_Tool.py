@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-__author__ = ['Gregory A. Greene, map.n.trowel@gmail.com']
+__author__ = ['Gregory A. Greene']
 
 import os
 import time

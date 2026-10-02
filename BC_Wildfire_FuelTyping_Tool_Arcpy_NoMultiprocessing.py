@@ -1,4 +1,4 @@
-__author__ = ['Gregory A. Greene, map.n.trowel@gmail.com']
+__author__ = ['Gregory A. Greene']
 
 import PySimpleGUI as sg
 import bcwft2018

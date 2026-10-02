@@ -4,7 +4,7 @@ Created on Wed Jan 25 12:15:00 2022
 
 @author: Gregory A. Greene
 """
-__author__ = ['Gregory A. Greene, map.n.trowel@gmail.com']
+__author__ = ['Gregory A. Greene']
 
 import inspect
 import pandas as pd
